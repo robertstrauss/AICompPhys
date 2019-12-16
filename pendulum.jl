@@ -49,6 +49,12 @@ plot(ss2)
 
 
 
+
+
+
+
+
+
 u0 = Float32[2.; 0.]
 datasize = 50
 tspan = (0.0f0,10.0f0)
@@ -99,7 +105,6 @@ Flux.train!(loss_n_ode, ps, data, opt, cb = cb)
 
 
 
-0
 
 
 
@@ -107,21 +112,45 @@ Flux.train!(loss_n_ode, ps, data, opt, cb = cb)
 
 
 
-fp = param([-1.0, 1.0]) # Initial Parameter Vector
+
+
+
+
+
+
+
+
+
+
+
+
+
+odeprob = remake(prob2,p=param([-2.0, 5.4]))
+
+fp = param([-1.0, 4.0]) # Initial Parameter Vector
 fparams = Flux.Params([fp])
 
 diffeq_rd(fp, prob2, Tsit5(), saveat=0.1)
 predict_rd() = diffeq_rd(fp, prob2, Tsit5(), saveat=0.1)[1,:]
+predict_rd1() = diffeq_rd(odeprob.p, odeprob, Tsit5(), saveat=0.1)[1,:]
+
+odeprob.p
+prob2.p
 
 
-loss_rd()     = sum(x^2 for x in predict_rd())
+loss_rd()     = sum(abs2, predict_rd()-predict_rd1())
+loss_rd()
+
 
 data = Iterators.repeated((), 100)
-opt = ADAM(0.1)
+opt = ADAM(0.005)
 callback = function()
+    println(fp)
     display(loss_rd())
     # using `remake` to re-create our `prob` with current parameters `p`
-    display(plot(solve(remake(prob2,p=Flux.data(fp)),Tsit5(),saveat=0.1)))
+    # display()
+    plot(solve(remake(prob2,p=Flux.data(fp)),Tsit5(),saveat=0.1))
+    display(scatter!([x.data for x in predict_rd1()]))
     # display(Plots.plot(p1ss, p2ss))
 end
 
