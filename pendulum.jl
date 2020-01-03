@@ -149,8 +149,9 @@ callback = function()
     display(loss_rd())
     # using `remake` to re-create our `prob` with current parameters `p`
     # display()
-    plot(solve(remake(prob2,p=Flux.data(fp)),Tsit5(),saveat=0.1))
-    display(scatter!([x.data for x in predict_rd1()]))
+    scatter(solve(remake(prob2,p=Flux.data(param([-2.0, 5.4]))),Tsit5(),saveat=1.0))
+
+    display(plot!(solve(remake(prob2,p=     Flux.data(fp)),Tsit5(),saveat=0.1)))
     # display(Plots.plot(p1ss, p2ss))
 end
 
