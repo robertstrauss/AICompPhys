@@ -183,16 +183,16 @@ b = Float32[ 1.3, -1.8]
 dudt = lv(A,b)
 
 ## 3-animal lotka-volterra
-u0 = gc(Float32[ 2.5; 5.0; 7.5 ])
-A = Float32[ 0.0   -0.535  0.532 ;
-             0.531  0.0   -0.536 ;
-            -0.534  0.533  0.0   ]
-b = Float32[ 0.4, -0.2, -0.2 ]
-dudt = lv(A,b)
+# u0 = gc(Float32[ 2.5; 5.0; 7.5 ])
+# A = Float32[ 0.0   -0.535  0.532 ;
+#              0.531  0.0   -0.536 ;
+#             -0.534  0.533  0.0   ]
+# b = Float32[ 0.4, -0.2, -0.2 ]
+# dudt = lv(A,b)
 
 ## only train on two of three channels
-cmap1 = [1.0,1.0,0.0]
-cmap2 = [1.0,1.0,0.0]
+# cmap1 = [1.0,1.0,0.0]
+# cmap2 = [1.0,1.0,0.0]
 
 
 
@@ -204,7 +204,7 @@ cmap2 = [1.0,1.0,0.0]
 ## 2-animal
 dudt_train = Chain(Dense(2,32,swish),Dense(32,32,swish),Dense(32,32,swish),Dense(32,2))
 ## 3-animal
-dudt_train = Chain(Dense(3,32,swish),Dense(32,32,swish),Dense(32,32,swish),Dense(32,3))
+# dudt_train = Chain(Dense(3,32,swish),Dense(32,32,swish),Dense(32,32,swish),Dense(32,3))
 ## tracking, necessary to train
 tracking = Flux.params(dudt_train)
 
@@ -242,6 +242,10 @@ function loss3(x)
     loss2(x...)
 end
 
+function lossBatch(batch...)
+    sum( abs2, case.n_ode(case.u0).*cmap1 - case.labels.*cmap2 )
+end
+
 # do loss but dont throw away prediction
 function losspred(;n_ode=n_ode,truth=truth)
     a = Flux.data(n_ode(u0))
@@ -257,19 +261,34 @@ cb = function ()
     display(pl)
     display(loss)
 end
+cb()
 
-cb2 = function(x=data4)
+cb2 = function(x=data5)
     pl = Plots.plot(legend=false)
     for (i,) in x
         cur_pred = Flux.data(i.n_ode(i.u0))
         loss = loss2(i)
-        Plots.plot!(pl,i.t,i.labels',label="truth")
-        Plots.scatter!(pl,i.t,cur_pred',label="prediction")
+        Plots.plot!(pl,i.labels'[:,1],i.labels'[:,2],label="truth")
+        Plots.scatter!(pl,cur_pred'[:,1],cur_pred'[:,2],label="prediction")
     end
-        display(pl)
-        display(loss)
+    display(pl)
+    display(loss)
 end
 cb2()
+
+cbBatch = function(batches=dataPara)
+    x = batches[1]
+    pl = Plots.plot(legend=false)
+    for i in x
+        cur_pred = Flux.data(i.n_ode(i.u0))
+        loss = loss2(i)
+        Plots.plot!(pl,i.labels'[:,1],i.labels'[:,2],label="truth")
+        Plots.scatter!(pl,cur_pred'[:,1],cur_pred'[:,2],label="prediction")
+    end
+    display(pl)
+    display(loss)
+end
+cbBatch()
 # time span
 tspan = (0.0f0,3.0f0)
 t = range(tspan...,length=100)
@@ -286,7 +305,8 @@ cb()
 d1 = datum(n_ode, truth, u0, t)
 data1 = [(d1,)]
 data2 = vcat(data1,data1)
-function makeDatum(startTime::Float32,stopTime::Float32;u0=u0)
+
+function timeDatum(startTime::Float32,stopTime::Float32;u0=u0)
     tspan = (startTime,stopTime)
     t = range(tspan...,length=30)
     truth=neural_ode(dudt,u0,(0,stopTime))
@@ -296,10 +316,28 @@ function makeDatum(startTime::Float32,stopTime::Float32;u0=u0)
     labels = Flux.data(truth2(t))
     datum(n_ode2,labels,u1,t)
 end
-data4 =[ (makeDatum(i*1.0f0,i*1.0f0+3.0f0),) for i in range(0.0f0,6.0f0,length=8)]
 
-loss2(data4[1]...)
+function uDatum(u0,dur)
+    tspan = (0.0f0,dur)
+    t = range(tspan...,length=30)
+    u1 = u0
+    n_ode2(u) = neural_ode(dudt_train,u,tspan,Tsit5(),saveat=t)
+    truth2 = neural_ode(dudt,u1,tspan)
+    labels = Flux.data(truth2(t))
+    datum(n_ode2,labels,u1,t)
+end
+
+data4 = [ ( timeDatum( i*1.0f0, i*1.0f0+3.0f0 ) ,) for i in range(0.0f0, 6.0f0,length=8 ) ]
+
+data5 = [ ( uDatum( [i*1.0f0, 3.5f0+3.0f0*sin(i*1.0f0)], 3.0f0 ) ,) for i in range(0.0f0, 6.0f0,length=8 ) ]
+
+dataPara = [ ( uDatum( [ [i+a, 3.5f0+3.0f0*sin(i)+a] for i in range(0.0f0, 6.0f0,length=8 ) ] , 5.0f0 )  ,) for a in range(0.0f0, 1.0f0, length=10) ]
+
+
+loss2(data5[1]...)
+
+lossBatch(dataPara[1])
 
 # train first with adam, then descent
-@Flux.epochs 50 Flux.train!(loss2, tracking, data4, ADAM(1.0E-3) ;    cb = Flux.throttle(cb2, 3))
+@Flux.epochs 5 Flux.train!(loss2, tracking, data5, ADAM(1.0E-3) ;    cb = Flux.throttle(cbBatch, 3))
 Flux.train!(loss, tracking, Iterators.repeated((),500), Descent(1.0E-6); cb = Flux.throttle(cb, 3))
