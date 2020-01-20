@@ -1,20 +1,28 @@
 using Flux, DiffEqFlux, DifferentialEquations, LinearAlgebra
-import Plots
+import Plots, Random
 
 include("MyUtils.jl")
 
 
 
 
+# single case
+struct seq
+    pred::Chain #NeuralODE
+    labels::AbstractArray
+    u0::AbstractArray
+    t
+end
 
-# truth ODE
-## 2-animal lotka-volterra
-u0 = gc(Float32[0.44249; 4.6280594])
-A = Float32[0.0 -0.9; 0.5 0.0]
-b = Float32[1.3, -1.8]
-dudt = lv(A, b)
+function uSeq(u0, dur)
+    tspan = (0.0f0, dur)
+    t = range(tspan..., length = 30)
+    truth = neural_ode(dudt, u0, tspan)
+    labels = Flux.data(truth(t))
+    seq(pred_bears, labels, u0, t)
+end
 
-"""
+
 ## 3-animal lotka-volterra
 u0 = gc(Float32[ 2.5; 5.0; 7.5 ])
 A = Float32[ 0.0   -0.535  0.532 ;
@@ -22,16 +30,6 @@ A = Float32[ 0.0   -0.535  0.532 ;
             -0.534  0.533  0.0   ]
 b = Float32[ 0.4, -0.2, -0.2 ]
 dudt = lv(A,b)
-
-## only train on two of three channels
-cmap1 = [1.0,1.0,0.0]
-cmap2 = [1.0,1.0,0.0]
-"""
-
-## use all channels
-cmap1 = Float32[1.0]
-cmap2 = Float32[1.0]
-
 
 # time span
 tspan = (0.0f0, 3.0f0)
@@ -43,18 +41,64 @@ Plots.plot(t, truth')
 
 
 # empty neural net of swishes
+pred_bears = Chain(
+    Dense(10, 32, swish),
+    Dense(32, 32, swish),
+    Dense(32, 1),
+)
+## tracking, necessary to train
+tracking = Flux.params(pred_bears)
+
+## loss functions
+
+loss(; pred=pred_bears, truth=truth)=sum(abs2, (pred_bears(truth[1:2,1:5][:])[1] - truth[3,1]))
+
+loss(d::seq) = loss(pred=d.pred, truth=d.labels)
+
+Random.seed!(1)
+dataInits = [
+        (uSeq([rand()*5, rand()*6, rand()*3], 3.0f0),)
+    for i in range(0.0f0, 6.0f0, length=8)]
+
+@Flux.epochs 15 Flux.train!(
+    loss,
+    tracking,
+    dataInits,
+    ADAM(1.0E-3);
+    cb = ()->println(loss(dataInits[1]...)),
+)
+
+
+
+
+
+#
+
+cmap1 = [1.0f0]
+cmap2 = [1.0f0]
+
+
+truth = neural_ode(dudt, u0, tspan, saveat=t)
+Plots.plot(t, truth')
+
+# empty neural net of swishes
 ## 2-animal net
 dudt_train = Chain(
-    Dense(2, 32, swish),
+    Dense(3, 32, swish),
     Dense(32, 32, swish),
     Dense(32, 32, swish),
-    Dense(32, 2),
+    Dense(32, 3),
 )
 ## tracking, necessary to train
 tracking = Flux.params(dudt_train)
 
 # neural net solver
-n_ode(u) = neural_ode(dudt_train, u, tspan, Tsit5(), saveat = t) #,reltol=1e-7,abstol=1e-9)
+function n_ode(u)
+    truth = neural_ode(dudt, u, tspan, saveat=t)
+    bears = pred_bears(truth[1:2,1:5][:]) # predict from the first 2 channels, first 5 points
+    uu = [u[1:2]..., bears]
+    neural_ode(dudt_train, uu, tspan, Tsit5(), saveat = t)
+end
 
 
 # single case
@@ -104,8 +148,8 @@ function cb(;truth=truth, losspred=losspred, t=t, pl=nothing)
     loss, cur_pred = losspred()
     println(truth)
     pl1 = (pl==nothing) ? Plots.plot() : pl
-    Plots.plot!(pl1, truth[1,:], truth[2,:], label = "truth")
-    Plots.scatter!(pl1, cur_pred[1,:], cur_pred[2,:], label = "prediction")
+    Plots.plot!(pl1, truth, label = "truth")
+    Plots.scatter!(pl1, t, cur_pred', label = "prediction")
     if (pl==nothing)
         display(pl1)
     end
@@ -113,19 +157,11 @@ function cb(;truth=truth, losspred=losspred, t=t, pl=nothing)
 end
 
 cb(d::datum) = cb(truth=d.labels,losspred=()->losspred(d),t=d.t)
-# function (d::datum)
-#     pl = Plots.plot(legend = false)
-#     cur_pred = Flux.data(d.n_ode(datum.u0))
-#     loss = loss(d)
-#     Plots.plot!(pl, d.labels'[:, 1], d.labels'[:, 2], label = "truth")
-#     Plots.scatter!(pl, cur_pred'[:, 1], cur_pred'[:, 2], label = "prediction")
-#     display(pl)
-#     display(loss)
-# end
+
 
 function cb(b::batch)
     pl = Plots.plot()
-    for i in 1:5 # only plot first five cases in batch b
+    for i in range(size(b.u)[2]) # only plot first five cases in batch b
         cb(
             truth=b.labels[:,i,:],
             losspred=()->losspred(n_ode=b.n_ode,truth=b.labels[:,i,:],u0=b.u[:,i]),
@@ -185,42 +221,25 @@ function uBatch(u0s, dur)
     batch(n_ode, labels, u0s, t)
 end
 
-# dataSects = [
-#         (timeDatum(i * 1.0f0, i * 1.0f0 + 3.0f0),)
-#     for i in range(0.0f0,6.0f0,length = 8)]
-
+Random.seed!(2)
 dataInits = [
-        (uDatum([i * 1.0f0, 3.5f0 + 3.0f0 * sin(i * 1.0f0)], 3.0f0),)
-    for i in range(0.0f0,6.0f0,length = 8)]
+        (uDatum([rand()*5, rand()*6, rand()*3], 3.0f0),)
+    for i in range(0.0f0, 6.0f0, length=8)]
 
-# dataPara = [(uDatum(
-#     [[i + a, 3.5f0 + 3.0f0 * sin(i) + a] for i in range(
-#         0.0f0,
-#         6.0f0,
-#         length = 8,
-#     )],
-#     5.0f0,
-# ),) for a in range(0.0f0, 1.0f0, length = 10)]
-
-inits(a) = hcat([
-        [i + a, 3.5f0 + 3.0f0 * sin(i) + a]
-    for i in range(0.0f0,6.0f0,length = 8)]...)
-dataBatch = [
-        (uBatch(inits(a),4.0f0,),)
-    for a in range(0.1f0, 1.0f0, length = 10)]
+# inits(a) = hcat([
+#         [i + a, 3.5f0 + 3.0f0 * sin(i) + a]
+#     for i in range(0.0f0,6.0f0,length = 8)]...)
+# dataBatch = [
+#         (uBatch(inits(a),4.0f0,),)
+#     for a in range(0.1f0, 1.0f0, length = 10)]
 
 
 @Flux.epochs 5 Flux.train!(
     loss,
     tracking,
-    dataBatch,
+    dataInits,
     ADAM(1.0E-3);
-    cb = Flux.throttle(()->cb(dataBatch[1]...), 3),
+    cb = Flux.throttle(()->cb(dataInits[1]...), 3),
 )
-Flux.train!(
-    loss,
-    tracking,
-    Iterators.repeated((), 500),
-    Descent(1.0E-6);
-    cb = Flux.throttle(cb, 3),
-)
+
+#

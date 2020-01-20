@@ -1,4 +1,4 @@
-using Flux, DiffEqFlux, DifferentialEquations, LinearAlgebra, Tracker
+using Flux, DiffEqFlux, DifferentialEquations, LinearAlgebra
 
 # GPU
 cu = 0
