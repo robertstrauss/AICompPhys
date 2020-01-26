@@ -160,12 +160,9 @@ function uBatch(u0s, dur)
     truth = neural_ode(dudt, u0s, tspan)
     labels = Flux.data(truth(t))
     n_ode2(u) = n_ode(u, t=t, tspan=tspan)
-    # neural_ode(dudt_train,
-    #     [u[1:2]...,
-    #      pred_bears(neural_ode(dudt, u, tspan, saveat = 0.0f0:0.1f0:0.5f0)[1:2,:][:])...],
-    #     tspan,Tsit5(),saveat = t)
     batch(n_ode2, labels, u0s, t)
 end
+
 
 Random.seed!(2)
 dataInits = [
@@ -173,10 +170,10 @@ dataInits = [
     for i in range(0.0f0, 6.0f0, length=8)]
 
 inits(a) = hcat([
-        u0.*(rand(Float32,size(u0)).+Float32(a))
+        (rand(Float32,size(u0)).+Float32(a))
     for i in 1:8]...)
 dataBatch = [
-        (uBatch(inits(a),20.0f0,),)
+        (uBatch(inits(a),5.0f0),)
     for a in 1:20]
 
 
@@ -186,7 +183,7 @@ cb(dataBatch[1]...)
     loss,
     tracking,
     dataBatch,
-    ADAM(1.0E-2);
+    Descent(1.0E-7);
     cb = Flux.throttle(()->cb(dataBatch[1]...), 3),
 )
 

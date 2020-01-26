@@ -102,7 +102,7 @@ losspred(b::batch) = losspred(n_ode=b.n_ode,truth=b.labels,u0=b.u)
 ## callbacks for output to plot prediction and truth
 function cb(;truth=truth, losspred=losspred, t=t, pl=nothing)
     loss, cur_pred = losspred()
-    println(truth)
+    # println(truth)
     pl1 = (pl==nothing) ? Plots.plot() : pl
     Plots.plot!(pl1, truth[1,:], truth[2,:], label = "truth")
     Plots.scatter!(pl1, cur_pred[1,:], cur_pred[2,:], label = "prediction")
@@ -214,7 +214,7 @@ dataBatch = [
     loss,
     tracking,
     dataBatch,
-    ADAM(1.0E-3);
+    ADAM(2.0E-3);
     cb = Flux.throttle(()->cb(dataBatch[1]...), 3),
 )
 Flux.train!(

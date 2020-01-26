@@ -430,6 +430,7 @@ m = Affine(2,3)
 
 m.W
 # output
+"""
 Tracked 3×2 Array{Float64,2}:
   0.213468   1.91803
   1.29768   -0.0585969

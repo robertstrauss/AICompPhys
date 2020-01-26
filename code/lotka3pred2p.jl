@@ -234,7 +234,7 @@ dataInits = [
 #     for a in range(0.1f0, 1.0f0, length = 10)]
 
 
-@Flux.epochs 5 Flux.train!(
+@Flux.epochs 3 Flux.train!(
     loss,
     tracking,
     dataInits,
