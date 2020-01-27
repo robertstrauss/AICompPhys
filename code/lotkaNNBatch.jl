@@ -104,8 +104,8 @@ function cb(;truth=truth, losspred=losspred, t=t, pl=nothing)
     loss, cur_pred = losspred()
     # println(truth)
     pl1 = (pl==nothing) ? Plots.plot() : pl
-    Plots.plot!(pl1, truth[1,:], truth[2,:], label = "truth")
-    Plots.scatter!(pl1, cur_pred[1,:], cur_pred[2,:], label = "prediction")
+    Plots.plot!(pl1, t, truth', label = "truth")
+    Plots.scatter!(pl1, t, cur_pred', label = "prediction")
     if (pl==nothing)
         display(pl1)
     end
@@ -125,7 +125,7 @@ cb(d::datum) = cb(truth=d.labels,losspred=()->losspred(d),t=d.t)
 
 function cb(b::batch)
     pl = Plots.plot()
-    for i in 1:5 # only plot first five cases in batch b
+    for i in 1:1 # only plot first five cases in batch b
         cb(
             truth=b.labels[:,i,:],
             losspred=()->losspred(n_ode=b.n_ode,truth=b.labels[:,i,:],u0=b.u[:,i]),
@@ -210,11 +210,11 @@ dataBatch = [
     for a in range(0.1f0, 1.0f0, length = 10)]
 
 
-@Flux.epochs 5 Flux.train!(
+@Flux.epochs 150 Flux.train!(
     loss,
     tracking,
     dataBatch,
-    ADAM(2.0E-3);
+    ADAM(1.0E-3);
     cb = Flux.throttle(()->cb(dataBatch[1]...), 3),
 )
 Flux.train!(
