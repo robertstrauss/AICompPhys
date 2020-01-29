@@ -24,15 +24,21 @@ end
 
 
 ## 3-animal lotka-volterra
-u0 = gc(Float32[ 2.5; 5.0; 7.5 ])
-A = Float32[ 0.0   -0.535  0.532 ;
-             0.531  0.0   -0.536 ;
-            -0.534  0.533  0.0   ]
-b = Float32[ 0.4, -0.2, -0.2 ]
+# u0 = gc(Float32[ 2.5; 5.0; 7.5 ])
+# A = Float32[ 0.0   -0.535  0.532 ;
+#              0.531  0.0   -0.536 ;
+#             -0.534  0.533  0.0   ]
+# b = Float32[ 0.4, -0.2, -0.2 ]
+# dudt = lv(A,b)
+u0 = Float32[ 5.5; 0.6; 15.7]
+A = Float32[ 0.0 -0.9  -0.1;
+              0.5  0.0  -0.1 ;
+              0.3  0.98  0.0]
+b = Float32[ 1.3, -1.8*0.5, -2.0] # netter with bears
 dudt = lv(A,b)
 
 # time span
-tspan = (0.0f0, 3.0f0)
+tspan = (0.0f0, 5.0f0)
 t = range(tspan..., length = 100)
 
 # recalculate truth and plot it against prediction
@@ -74,8 +80,8 @@ dataInits = [
 
 #
 
-cmap1 = [1.0f0]
-cmap2 = [1.0f0]
+cmap1 = [1.0f0; 1.0f0; 0.0f0]
+cmap2 = [1.0f0; 1.0f0; 0.0f0]
 
 
 truth = neural_ode(dudt, u0, tspan, saveat=t)
@@ -144,8 +150,9 @@ losspred(b::batch) = losspred(n_ode=b.n_ode,truth=b.labels,u0=b.u)
 
 
 ## callbacks for output to plot prediction and truth
-function cb(;truth=truth, losspred=losspred, t=t, pl=nothing)
-    loss, cur_pred = losspred()
+function cb(;truth=truth, n_ode=n_ode, losspred=losspred, t=t, pl=nothing)
+    # loss, cur_pred = losspred()
+    cur_pred = Flux.data(n_ode(u0))
     println(truth)
     pl1 = (pl==nothing) ? Plots.plot() : pl
     Plots.plot!(pl1, truth, label = "truth")
@@ -153,7 +160,7 @@ function cb(;truth=truth, losspred=losspred, t=t, pl=nothing)
     if (pl==nothing)
         display(pl1)
     end
-    display(loss)
+    # display(loss)
 end
 
 cb(d::datum) = cb(truth=d.labels,losspred=()->losspred(d),t=d.t)
@@ -233,12 +240,22 @@ dataInits = [
 #         (uBatch(inits(a),4.0f0,),)
 #     for a in range(0.1f0, 1.0f0, length = 10)]
 
+cb(dataInits[1]...)
 
-@Flux.epochs 3 Flux.train!(
+tspan = (0.0f0, 10.0f0)
+t = range(tspan..., length = 100)
+
+truth = neural_ode(dudt, u0, tspan, saveat = t)
+Plots.plot(t, truth')
+
+d1 = dataInits[1][1]
+
+
+@Flux.epochs 50 Flux.train!(
     loss,
     tracking,
     dataInits,
-    ADAM(1.0E-3);
+    ADAM(1.0E-5);
     cb = Flux.throttle(()->cb(dataInits[1]...), 3),
 )
 

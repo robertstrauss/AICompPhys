@@ -183,7 +183,7 @@ cb(dataBatch[1]...)
     loss,
     tracking,
     dataBatch,
-    Descent(1.0E-7);
+    ADAM(1.0E-3);
     cb = Flux.throttle(()->cb(dataBatch[1]...), 3),
 )
 
