@@ -1,10 +1,12 @@
 using DifferentialEquations
+
 function lotka_volterra(du,u,p,t)
   x,y = u
   a, b, c, d = p
   du[1] = dx = a*x - b*x*y
   du[2] = dy = -c*y + d*x*y
 end
+
 u0 = [1.0,1.0]
 tspan = (0.0,10.0)
 p = [1.5 1.0 3.0 1.0]
@@ -43,4 +45,3 @@ end
 cb()
 
 Flux.train!(loss_rd, params, data, opt, cb = cb)
-# plot(collect(-sin(i/10)/2+1 for i in 1:101),ylim=(0,6))
