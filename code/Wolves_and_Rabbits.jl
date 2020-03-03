@@ -16,26 +16,37 @@ tspan = (0.0f0,16.0f0)
 t = range(tspan[1], tspan[2], length=100)
 
 
-include("MyUtils.jl")
+# Lotka-Volterra data structure
+struct lv
+    A
+    b
+end
 
+# every instance of lv also doubles as a function, which returns the rate of change
+#   of an input population based on the parameters of the lv instance ( b and A )
+(m::lv)(x) = x.*( m.b .+ m.A*x)
+
+# this allows flux to look inside the structure to attach trackers to parameters
+@Flux.treelike lv
 
 
 # u represents the state of the system, being a vector of the two populations - rabbits and wolves.
 # u0 is the initial condition. These could be in units of millions of individuals, or anything.
-u0 = gc(Float32[0.44249; 4.6280594])
+u0 = Array(Float32[0.44249; 4.6280594])
 
 # A and b define the constant coeffecient parameters of the system
 # they represent the "hungriness" of the wolves and the natural population growth/death rate
 A = Float32[0.0 -0.9; 0.5 0.0]
 b = Float32[1.3, -1.8]
 
-# the equation, a lotka-volterra system using the parametrs given
-# This is a function that takes in a vector of two populations
+# the differential equation, a lotka-volterra system using the parametrs given
+# dudt is a function that takes in a vector of two populations
+# and outputs the rate of change. A and b are the constant paramers of this system
 dudt = lv(A, b)
 
 # solution to the equation from the intial condition over the timespan
 sol = neural_ode(dudt, u0, tspan, saveat=t)
-data = Array(Flux.data(sol)) # strips the autograd trackers from it
+data = Array(Flux.data(sol)) # strips the autograd trackers from it, to get just an array of data
 
 plot(t, data') # plot the solution over time
 

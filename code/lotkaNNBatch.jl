@@ -8,11 +8,16 @@ include("MyUtils.jl")
 
 
 # truth ODE
+
 ## 2-animal lotka-volterra
 u0 = gc(Float32[0.44249; 4.6280594])
 A = Float32[0.0 -0.9; 0.5 0.0]
 b = Float32[1.3, -1.8]
 dudt = lv(A, b)
+
+## use all channels
+cmap1 = Float32[1.0]
+cmap2 = Float32[1.0]
 
 """
 ## 3-animal lotka-volterra
@@ -28,9 +33,7 @@ cmap1 = [1.0,1.0,0.0]
 cmap2 = [1.0,1.0,0.0]
 """
 
-## use all channels
-cmap1 = Float32[1.0]
-cmap2 = Float32[1.0]
+
 
 
 # time span
@@ -100,7 +103,7 @@ losspred(b::batch) = losspred(n_ode=b.n_ode,truth=b.labels,u0=b.u)
 
 
 ## callbacks for output to plot prediction and truth
-function cb(;truth=truth, losspred=losspred, t=t, pl=nothing)
+cb = function(;truth=truth, losspred=losspred, t=t, pl=nothing)
     loss, cur_pred = losspred()
     # println(truth)
     pl1 = (pl==nothing) ? Plots.plot() : pl
@@ -123,7 +126,7 @@ cb(d::datum) = cb(truth=d.labels,losspred=()->losspred(d),t=d.t)
 #     display(loss)
 # end
 
-function cb(b::batch)
+cb = function(b::batch)
     pl = Plots.plot()
     for i in 1:1 # only plot first five cases in batch b
         cb(
