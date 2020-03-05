@@ -230,10 +230,13 @@ Flux.train!(
 )
 
 
-for b in dataBatch
-    u0s = b[1].u
-    println(u0s)
-    for u0 in u0s
-        println(u0)
-    end
+# pl = Plots.plot()
+# for (b,) in dataBatch
+b = dataBatch[1][1]
+allsols = permutedims(cat(b.labels..., dims=3),(2,3,1))
+# println(allsols)
+for i in 1:8
+    Plots.plot(allsols[i,:,:])
+    Plots.png("figs/2solbatch/"*string(i))
 end
+# end
