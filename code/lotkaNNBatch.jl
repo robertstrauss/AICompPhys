@@ -228,3 +228,12 @@ Flux.train!(
     Descent(1.0E-6);
     cb = Flux.throttle(cb, 3),
 )
+
+
+for b in dataBatch
+    u0s = b[1].u
+    println(u0s)
+    for u0 in u0s
+        println(u0)
+    end
+end
