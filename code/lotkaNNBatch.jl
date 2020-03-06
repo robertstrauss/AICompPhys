@@ -228,3 +228,15 @@ Flux.train!(
     Descent(1.0E-6);
     cb = Flux.throttle(cb, 3),
 )
+
+
+# pl = Plots.plot()
+# for (b,) in dataBatch
+b = dataBatch[1][1]
+allsols = permutedims(cat(b.labels..., dims=3),(2,3,1))
+# println(allsols)
+for i in 1:8
+    Plots.plot(allsols[i,:,:])
+    Plots.png("figs/2solbatch/"*string(i))
+end
+# end
